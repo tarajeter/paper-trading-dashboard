@@ -24,3 +24,23 @@ h1 {
   padding: 20px;
   border-radius: 12px;
 }
+
+input {
+  padding: 10px;
+  margin-right: 10px;
+  border-radius: 8px;
+  border: none;
+}
+
+button {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.balance-main {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 10px 0;
+}
