@@ -394,29 +394,21 @@ function App() {
                 totalPortfolioValue) * 100;
 
               return (
-              <div key={position.symbol} className="position-card">
+              <div className="position-card">
+                <div className="position-header">
+                  <h3>{position.symbol}</h3>
 
-                <h3>{position.symbol}</h3>
+                  <span className={profitLoss >= 0 ? "profit" : "loss"}>
+                    ${profitLoss.toFixed(2)}
+                  </span>
+                </div>
 
-                <p>Shares: {position.shares}</p>
-
-                <p>
-                  Avg Price: $
-                  {position.averagePrice.toFixed(2)}
-                </p>
-
-                <p>
-                  Market Value: $
-                  {(position.shares * position.currentPrice).toFixed(2)}
-                </p>
-
-                <p className={profitLoss >= 0 ? "profit" : "loss"}>
-                  Profit/Loss: ${profitLoss.toFixed(2)}
-                </p>
-
-                <p>Allocation: {allocation.toFixed(1)}%
-                </p>
-
+                <div className="position-grid">
+                  <p>Shares: <strong>{position.shares}</strong></p>
+                  <p>Avg: <strong>${position.averagePrice.toFixed(2)}</strong></p>
+                  <p>Value: <strong>${(position.shares * position.currentPrice).toFixed(2)}</strong></p>
+                  <p>Allocation: <strong>{allocation.toFixed(1)}%</strong></p>
+                </div>
               </div>
               );
           })
@@ -432,14 +424,21 @@ function App() {
             </p>
           )}
 
-          <select
-          value={tradeType}
-          onChange={(e) => setTradeType(e.target.value)}
-          >
-            <option value="buy">Buy</option>
-            <option value="sell">Sell</option>
-          </select>
+          <div className="trade-toggle">
+            <button
+            className={tradeType === "buy" ? "toggle-active buy-toggle" : ""}
+            onClick={() => setTradeType("buy")}
+            >Buy
+           </button>
 
+            <button
+            className={tradeType === "sell" ? "toggle-active sell-toggle" : ""}
+            onClick={() => setTradeType("sell")}
+            >Sell
+           </button>
+          </div>
+
+         <div className="trade-form">  
           <input
           type="text"
           placeholder="Ticker"
@@ -454,10 +453,13 @@ function App() {
           onChange={(e) => setTradeShares(e.target.value)}
           />
 
-          <button onClick={handleTrade}>
-           Submit Trade
+          <button 
+          className={tradeType === "buy" ? "submit-buy" : "submit-sell"}
+          onClick={handleTrade}
+          >
+           {tradeType === "buy" ? "Buy Shares" : "Sell Shares"}
           </button>
-
+         </div> 
         </section>
 
         <section className="card">
@@ -468,10 +470,15 @@ function App() {
          ) : (
           tradeHistory.map((trade, index) => (
             <div key={index} className="trade-row">
-              <span>{trade.type} {trade.symbol}</span>
+
+              <span className={trade.type === "BUY" ? "profit" : "loss"}>
+                {trade.type}
+              </span>
+
+              <span>{trade.symbol}</span>
               <span>{trade.shares} shares</span>
               <span>${trade.price.toFixed(2)}</span>
-              <span>Total: ${trade.total.toFixed(2)}</span>
+              <span>${trade.total.toFixed(2)}</span>
             </div>
           )) 
          )}
