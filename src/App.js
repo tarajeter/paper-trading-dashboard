@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
+import axios from "axios";
 import "./App.css";
+
 
 function App() {
 
@@ -30,6 +32,8 @@ function App() {
   const [tradeType, setTradeType] = useState("buy");
   const [hasLoadedSavedData, setHasLoadedSavedData] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const API_KEY = process.env.REACT_APP_FINNHUB_API_KEY;
 
 
   useEffect(() => {
@@ -70,24 +74,6 @@ function App() {
   ]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setWatchlist((currentWatchlist) =>
-      currentWatchlist.map((stock) => {
-        const priceChange = (Math.random() - 0.5) * 2;
-
-        return {
-          ...stock,
-          price: Math.max(1, stock.price + priceChange),
-          change: priceChange,
-        };
-      })
-     );
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
     setPositions((currentPositions) =>
     currentPositions.map((position) => {
       const matchingStock = watchlist.find(
@@ -103,6 +89,16 @@ function App() {
     })
   );
   }, [watchlist]);
+
+  useEffect(() => {
+    updateStockPrices();
+
+    const interval = setInterval(() => {
+      updateStockPrices();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
 
 
   const addTicker = () => {
@@ -276,6 +272,29 @@ function App() {
 
     setTradeSymbol("");
     setTradeShares("");
+  }
+
+
+  async function updateStockPrices() {
+    try {
+      const updatedWatchlist = await Promise.all(
+        watchlist.map(async (stock) => {
+          const response = await axios.get(
+            `https://finnhub.io/api/v1/quote?symbol=${stock.symbol.trim()}&token=${API_KEY}`
+          );
+
+          return {
+            ...stock,
+            price: response.data.c,
+            change: response.data.dp,
+          };
+        })
+      );
+
+      setWatchlist(updatedWatchlist);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   return (
