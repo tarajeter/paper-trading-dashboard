@@ -39,6 +39,11 @@ button {
   cursor: pointer;
 }
 
+button:hover {
+  transform: translateY(-2px);
+  transition: all 0.2s ease;
+}
+
 .balance-main {
   font-size: 2rem;
   font-weight: 700;
@@ -129,8 +134,8 @@ button {
   min-height: 260px;
 }
 
-.chart-placeholder {
-  height: 170px;
+.chart-container {
+  height: 340px;
   display: flex;
   align-items: end;
   gap: 10px;
@@ -163,6 +168,11 @@ button {
   background: #111827;
   color: #9ca3af;
   border: 1px solid #374151;
+}
+
+.trade-toggle button:hover {
+  transform: translateY(-2px);
+  transition: all 0.2s ease;
 }
 
 .trade-toggle .toggle-active {
@@ -244,5 +254,120 @@ button {
 }
 
 .trade-row span {
+  font-size: 0.9rem;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.summary-grid div {
+  background: #374151;
+  padding: 14px;
+  border-radius: 12px;
+}
+
+.summary-grid span {
+  display: block;
+  color: #9ca3af;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.summary-grid strong {
+  font-size: 1.2rem;
+}
+
+.sort-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.sort-controls button {
+  background: #374151;
+  color: white;
+}
+
+.sort-controls button:hover {
+  transform: translateY(-2px);
+  transition: all 0.2s ease;
+}
+
+.watchlist-price {
+  text-align: right;
+}
+
+.watchlist-row {
+  cursor: pointer;
+  transform: 0.2s ease;
+  border-radius: 10px;
+}
+
+.watchlist-row:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.active-stock {
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.watchlist-row:hover strong {
+  color: #38bdf8;
+}
+
+.position-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.position-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+  transition: all 0.2s ease;
+}
+
+.active-position {
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.news-container {
+  display: grid;
+  gap: 12px;
+}
+
+.news-card {
+  display: flex;
+  gap: 12px;
+  text-decoration: none;
+  color: white;
+  background: #374151;
+  padding: 12px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.news-card:hover {
+  transform: translateY(-2px);
+  background: #4b5563;
+}
+
+.news-card img {
+  width: 120px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.news-card h3 {
+  margin-bottom: 6px;
+}
+
+.news-card p {
+  color: #9ca3af;
   font-size: 0.9rem;
 }

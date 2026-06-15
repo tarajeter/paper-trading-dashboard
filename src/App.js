@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import "./App.css";
+
 
 
 function App() {
@@ -32,8 +41,9 @@ function App() {
   const [tradeType, setTradeType] = useState("buy");
   const [hasLoadedSavedData, setHasLoadedSavedData] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-
-  const API_KEY = process.env.REACT_APP_FINNHUB_API_KEY;
+  const [sortBy, setSortBy] = useState("value");
+  const [news, setNews] = useState([]);
+  const [priceHistory, setPriceHistory] = useState([]);
 
 
   useEffect(() => {
@@ -100,6 +110,14 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    fetchNews();
+  }, []);
+
+  useEffect(() => {
+    setPriceHistory([]);
+  }, [selectedStock]);
+ 
 
   const addTicker = () => {
     if (!ticker.trim()) return;
@@ -146,6 +164,18 @@ function App() {
     101100,
     accountValue,
   ];
+
+  const investedAmount = portfolioValue;
+
+  const cashAllocation = 
+  accountValue > 0 ? (cashBalance / accountValue) * 100 : 0;
+
+  const investedAllocation =
+  accountValue > 0 ? (investedAmount / accountValue) * 100 : 0;
+
+  const winningPositions = positions.filter(
+    (position) => position.currentPrice >= position.averagePrice
+  ).length;
 
   function handleTrade() {
 
@@ -274,13 +304,44 @@ function App() {
     setTradeShares("");
   }
 
+  const sortedPositions = [...positions].sort((a, b) => {
+    if (sortBy === "alphabetical") {
+      return a.symbol.localeCompare(b.symbol);
+    }
+
+    if (sortBy === "profit") {
+      const profitA =
+      (a.currentPrice - a.averagePrice) * a.shares;
+
+      const profitB =
+      (b.currentPrice - b.averagePrice) * b.shares;
+
+      return profitB - profitA;
+    }
+
+    if (sortBy === "allocation") {
+      const allocA =
+      (a.shares * a.currentPrice) / portfolioValue;
+
+      const allocB =
+      (b.shares * b.currentPrice) / portfolioValue;
+
+      return allocB - allocA;
+    }
+
+    return (
+      b.shares * b.currentPrice -
+      a.shares * a.currentPrice
+    );
+  });
+
 
   async function updateStockPrices() {
     try {
       const updatedWatchlist = await Promise.all(
         watchlist.map(async (stock) => {
           const response = await axios.get(
-            `https://finnhub.io/api/v1/quote?symbol=${stock.symbol.trim()}&token=${API_KEY}`
+            `http://localhost:5000/api/quote/${stock.symbol.trim()}`
           );
 
           return {
@@ -292,6 +353,35 @@ function App() {
       );
 
       setWatchlist(updatedWatchlist);
+
+      const selected = updatedWatchlist.find(
+        (stock) => stock.symbol === selectedStock
+      );
+
+      if (selected) {
+        setPriceHistory((currentHistory) => [
+          ...currentHistory.slice(-19),
+          {
+            time: new Date().toLocaleTimeString([], {
+              hour: "numeric",
+              minute: "2-digit",
+            }),
+            price: selected.price,
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function fetchNews() {
+    try {
+      const response = await axios.get(
+        "http://localhost:5000/api/news"
+      );
+
+      setNews(response.data);
     } catch (error) {
       console.error(error);
     }
@@ -338,27 +428,54 @@ function App() {
         </section>
 
         <section className="card chart-card">
-          <div className="section-header">
+          <h2>{selectedStock} Price Chart</h2>
+          <p>Live price updates from your backend API</p>
+
+          <div className="chart-container">
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={priceHistory}>
+                <XAxis dataKey="time" />
+                <YAxis domain={["auto", "auto"]} />
+                <Tooltip />
+                <Line
+                 type="monotone"
+                 dataKey="price"
+                 stroke="#22c55e"
+                 strokeWidth={3}
+                 dot={false}
+                 />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+        
+        <section className="card">
+          <h2>Portfolio Summary</h2>
+
+          <div className="summary-grid">
             <div>
-              <h2>Portfolio Performance</h2>
-              <p>Simulated account value trend</p>
+              <span>Invested</span>
+              <strong>{investedAllocation.toFixed(1)}%</strong>
             </div>
 
-            <span className={totalProfitLoss >= 0 ? "profit" : "loss"}>
-              {totalProfitLoss >= 0 ? "+" : ""}
-              ${totalProfitLoss.toFixed(2)}
-            </span>
-          </div>
+            <div>
+              <span>Cash</span>
+              <strong>{cashAllocation.toFixed(1)}%</strong>
+            </div>
 
-          <div className="chart-placeholder">
-            {chartData.map((value, index) => (
-              <div
-               key={index}
-               className="chart-bar"
-               style={{height: `${Math.max(20, (value / accountValue) * 120)}px`,
-              }}
-              ></div>
-            ))}
+            <div>
+              <span>Winning Positions</span>
+              <strong>
+                {winningPositions}/{positions.length}
+              </strong>
+            </div>
+
+            <div>
+              <span>Total P/L</span>
+              <strong className={totalProfitLoss >= 0 ? "profit" : "loss"}>
+                ${totalProfitLoss.toFixed(2)}
+              </strong>
+            </div>
           </div>
         </section>
 
@@ -376,13 +493,21 @@ function App() {
 
           <div className="watchlist">
             {watchlist.map((stock) => (
-              <div key={stock.symbol} className="watchlist-row">
+              <div 
+              key={stock.symbol}
+              className={
+                selectedStock === stock.symbol
+                ? "watchlist-row active-stock"
+                : "watchlist-row"
+              }
+              onClick={() => setSelectedStock(stock.symbol)}
+              >
                 <div>
                   <strong>{stock.symbol}</strong>
                   <p>{stock.name}</p>
                 </div>
 
-                <div>
+                <div className="watchlist-price">
                   <strong>${stock.price.toFixed(2)}</strong>
                   <p className={stock.change >= 0 ? "profit" : "loss"}>
                     {stock.change >= 0 ? "+" : ""}
@@ -396,13 +521,60 @@ function App() {
         </section>
 
         <section className="card">
+          <h2>Market News</h2>
+
+          <div className="news-container">
+            {news.map((article) => (
+              <a
+              key={article.id}
+              href={article.url}
+              target="_blank"
+              rel="noreferrer"
+              className="news-card"
+              >
+                <img
+                src={article.image}
+                alt={article.headline}
+                />
+
+                <div>
+                  <h3>{article.headline}</h3>
+
+                  <p>
+                    {article.summary?.slice(0, 120)}...
+                  </p>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+
+        <section className="card">
           <h2>Portfolio</h2>
+
+          <div className="sort-controls">
+            <button onClick={() => setSortBy("value")}>
+              Value
+            </button>
+
+            <button onClick={() => setSortBy("profit")}>
+              Profit
+            </button>
+
+            <button onClick={() => setSortBy("allocation")}>
+              Allocation
+            </button>
+
+            <button onClick={() => setSortBy("alphabetical")}>
+              A-Z
+            </button>
+          </div>
 
           {positions.length === 0 ? (
             <p>No open positions</p>
           ) : (
 
-            positions.map((position) => {
+              sortedPositions.map((position) => {
 
               const profitLoss =
               (position.currentPrice - position.averagePrice)*
@@ -413,7 +585,13 @@ function App() {
                 totalPortfolioValue) * 100;
 
               return (
-              <div className="position-card">
+              <div className={
+                selectedStock === position.symbol
+                ? "position-card active-position"
+                : "position-card"
+              }
+              onClick={() => setSelectedStock(position.symbol)}
+              >
                 <div className="position-header">
                   <h3>{position.symbol}</h3>
 
