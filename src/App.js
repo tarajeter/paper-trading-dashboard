@@ -730,9 +730,7 @@ function App() {
       <h1>Paper Trading Dashboard</h1>
 
       <p className="auth-subtitle">
-        {isRegistering
-        ? "Create your account to start paper trading."
-        : "Login to access your trading workspace."}
+        Practice trading with simulated funds and live market data.
       </p>
 
       <button onClick={handleLogout}>Logout</button>
