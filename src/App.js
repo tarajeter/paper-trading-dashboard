@@ -10,11 +10,13 @@ import {
 } from "recharts";
 import "./App.css";
 
+const API_URL = 
+process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 
 
 function App() {
 
-  const balance = 100000;
 
   const [watchlist, setWatchlist] = useState([
   { symbol: "AAPL", name: "Apple", price: 210.25, change: 1.2 },
@@ -45,43 +47,53 @@ function App() {
   const [news, setNews] = useState([]);
   const [priceHistory, setPriceHistory] = useState([]);
 
+  const [user, setUser] = useState(null);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+  const [registerEmail, setRegisterEmail] = useState("");
+  const [registerPassword, setRegisterPassword] = useState("");
+  const [registerMessage, setRegisterMessage] = useState("");
+  const [isRegistering, setIsRegistering] = useState(false);
 
-  useEffect(() => {
-    const savedData = localStorage.getItem("paperTradingData");
 
-    if (savedData) {
-      const data = JSON.parse(savedData);
 
-      setCashBalance(data.cashBalance || 100000);
-      setPositions(data.positions || []);
-      setTradeHistory(data.tradeHistory || []);
-      setWatchlist(data.watchlist || watchlist);
-    }
+  //useEffect(() => {
+    //const savedData = localStorage.getItem("paperTradingData");
 
-    setHasLoadedSavedData(true);
-  }, []);
+    //if (savedData) {
+      //const data = JSON.parse(savedData);
 
-  useEffect (() => {
-    if (!hasLoadedSavedData) return;
+     // setCashBalance(data.cashBalance || 100000);
+     // setPositions(data.positions || []);
+      //setTradeHistory(data.tradeHistory || []);
+     // setWatchlist(data.watchlist || watchlist);
+   // }
 
-    const data = {
-      cashBalance,
-      positions,
-      tradeHistory,
-      watchlist,
-    };
+   // setHasLoadedSavedData(true);
+ // }, []);
 
-    localStorage.setItem(
-      "paperTradingData",
-      JSON.stringify(data)
-    );
-  }, [
-    hasLoadedSavedData,
-    cashBalance,
-    positions,
-    tradeHistory,
-    watchlist,
-  ]);
+  //useEffect (() => {
+   // if (!hasLoadedSavedData) return;
+
+    //const data = {
+     // cashBalance,
+      //positions,
+     // tradeHistory,
+      //watchlist,
+    //};
+
+    //localStorage.setItem(
+     // "paperTradingData",
+     // JSON.stringify(data)
+   // );
+ // }, [
+   // hasLoadedSavedData,
+   // cashBalance,
+    //positions,
+   // tradeHistory,
+   // watchlist,
+ // ]);
 
   useEffect(() => {
     setPositions((currentPositions) =>
@@ -130,6 +142,29 @@ function App() {
     setTicker("");
   }
 
+  useEffect(() => {
+    const savedToken = localStorage.getItem("token");
+
+    if (savedToken) {
+      axios
+      .get(`${API_URL}/api/profile`, {
+        headers: {
+          Authorization: `Bearer ${savedToken}`,
+        },
+      })
+      .then((response) => {
+        setUser(response.data.user);
+        loadPositions();
+        loadTradeHistory();
+        loadCashBalance();
+      })
+      .catch(() => {
+        localStorage.removeItem("token");
+        setUser(null);
+      });
+    }
+  }, []);
+
   const newStock = {
     symbol: ticker.toUpperCase(),
     name: "Custom Stock",
@@ -177,15 +212,92 @@ function App() {
     (position) => position.currentPrice >= position.averagePrice
   ).length;
 
-  function handleTrade() {
+  async function savePosition(symbol, shares, purchasePrice) {
+    try {
+      const token = localStorage.getItem("token");
+
+      await axios.post(
+        `${API_URL}/api/positions`,
+        {
+          symbol,
+          shares,
+          purchase_price: purchasePrice,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      await loadPositions();
+    } catch (error) {
+      console.error("Failed to save position:", error);
+    }
+  }
+
+  async function sellPosition(symbol, shares) {
+    try {
+      const token = localStorage.getItem("token");
+
+      await axios.post(
+        `${API_URL}/api/positions/sell`,
+        {
+          symbol,
+          shares,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      await loadPositions();
+    } catch (error) {
+      console.error("Failed to sell position:", error);
+      setErrorMessage(
+        error.response?.data?.error || "Failed to sell position"
+      );
+    }
+  }
+
+  async function saveTrade(type, symbol, shares, price, total) {
+    try {
+      const token = localStorage.getItem("token");
+
+      await axios.post(`${API_URL}/api/trades`, 
+        {
+          type,
+          symbol,
+          shares,
+          price,
+          total,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Error saving trade:", error);
+    }
+  }
+
+  async function handleTrade() {
 
     setErrorMessage("");
 
     const shares = Number(tradeShares);
 
     const stock = watchlist.find(
-      (item) => item.symbol === tradeSymbol.toUpperCase()
+      (item) => item.symbol.trim().toUpperCase() === tradeSymbol.trim().toUpperCase()
     );
+
+    console.log("Trade symbol:", tradeSymbol);
+    console.log("Watchlist:", watchlist);
+    console.log('Found stock:', stock);
 
     if (!stock) {
       setErrorMessage("Ticker not found"); 
@@ -205,58 +317,42 @@ function App() {
       return;
     }
 
-    setCashBalance(cashBalance - tradeCost);
+    const newBalance = cashBalance - tradeCost;
 
-    const existingPosition = positions.find(
-      (position) => position.symbol === stock.symbol
+    setCashBalance(newBalance);
+
+    const token = localStorage.getItem("token");
+
+    await axios.put(
+      `${API_URL}/api/cash`,
+      { cashBalance: newBalance },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
     );
 
-    if (existingPosition) {
-      const updatedPositions = positions.map((position) => {
-        if (position.symbol === stock.symbol) {
-          const totalShares = position.shares + shares;
-
-          const totalCost =
-          position.averagePrice * position.shares +
-          stock.price * shares;
-
-          return {
-            ...position,
-            shares: totalShares,
-            averagePrice: totalCost / totalShares,
-            currentPrice: stock.price,
-          };
-        }
-
-        return position;
-      });
-
-      setPositions(updatedPositions);
-    } else {
-      const newPosition = {
-        symbol: stock.symbol,
-        shares,
-        averagePrice: stock.price,
-        currentPrice: stock.price,
-      };
-
-      setPositions([...positions, newPosition]);
-    }
-
-    const newTrade = {
-      type: "BUY",
-      symbol: stock.symbol,
+    await savePosition(
+      stock.symbol.toUpperCase(),
       shares,
-      price: stock.price,
-      total: tradeCost,
-    };
+      stock.price
+    );
 
-    setTradeHistory([...tradeHistory, newTrade]);
+    await saveTrade(
+      "BUY",
+      stock.symbol,
+      shares,
+      stock.price,
+      tradeCost
+    );
+    
+    await loadTradeHistory();
   }
 
     else {
       const existingPosition = positions.find(
-        (position) => position.symbol === stock.symbol
+        (position) => position.symbol.trim().toUpperCase() === stock.symbol.trim().toUpperCase()
       );
 
       if (!existingPosition) {
@@ -271,34 +367,39 @@ function App() {
 
       const saleTotal = shares * stock.price;
 
-      setCashBalance(cashBalance + saleTotal);
+      const newBalance = cashBalance + saleTotal;
 
-      const updatedPositions = positions
-      .map((position) => {
-        if (position.symbol === stock.symbol) {
-          return {
-            ...position,
-            shares: position.shares - shares,
-          };
+      setCashBalance(newBalance);
+
+      const token = localStorage.getItem("token");
+
+      await axios.put(
+        `${API_URL}/api/cash`,
+        { cashBalance: newBalance },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
+      );
 
-        return position;
-      })
-      .filter((position) => position.shares > 0);
+      await sellPosition(
+        stock.symbol.toUpperCase(),
+        shares
+      );
 
-      setPositions(updatedPositions);
-      
-      const newTrade = {
-        type: "SELL",
-        symbol: stock.symbol,
+      await saveTrade(
+        "SELL",
+        stock.symbol,
         shares,
-        price: stock.price,
-        total: saleTotal,
-      };
+        stock.price,
+        saleTotal
+      );
 
-      setTradeHistory([...tradeHistory, newTrade]);
-
+      await loadTradeHistory();
     }
+
+    
 
     setTradeSymbol("");
     setTradeShares("");
@@ -341,7 +442,7 @@ function App() {
       const updatedWatchlist = await Promise.all(
         watchlist.map(async (stock) => {
           const response = await axios.get(
-            `http://localhost:5000/api/quote/${stock.symbol.trim()}`
+            `${API_URL}/api/quote/${stock.symbol.trim()}`
           );
 
           return {
@@ -378,7 +479,7 @@ function App() {
   async function fetchNews() {
     try {
       const response = await axios.get(
-        "http://localhost:5000/api/news"
+        `${API_URL}/api/news`
       );
 
       setNews(response.data);
@@ -387,10 +488,254 @@ function App() {
     }
   }
 
+  async function loadPositions() {
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await axios.get(`${API_URL}/api/positions`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setPositions(
+        response.data.map((position) => ({
+          symbol: position.symbol,
+          shares: position.shares,
+          averagePrice: position.purchase_price,
+          currentPrice: position.purchase_price,
+        }))
+      );
+    } catch (error) {
+      console.error("Failed to load positions:", error);
+    }
+  }
+
+  async function loadTradeHistory() {
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await axios.get(`${API_URL}/api/trades`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log(response.data);
+
+      setTradeHistory(response.data);
+    } catch (error) {
+      console.error("Error loading trade history:", error);
+    }
+  }
+
+  async function loadCashBalance() {
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await axios.get(`${API_URL}/api/cash`, 
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      console.log("Cash response:", response.data);
+
+      setCashBalance(response.data.cashBalance);
+    } catch (error) {
+      console.error("Failed to load cash balance:", error);
+    }
+  }
+
+  async function handleLogin() {
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/login`,
+        {
+          email: loginEmail,
+          password: loginPassword,
+        }
+      );
+
+      localStorage.setItem("token", response.data.token);
+
+      console.log("Token from login:", response.data.token);
+      console.log("Stored token:", localStorage.getItem("token"));
+
+      setUser(response.data.user);
+
+      await loadPositions();
+      await loadTradeHistory();
+      await loadCashBalance();
+
+      setAuthMessage("");
+    } catch (error) {
+      setAuthMessage("Invalid email or password");
+    }
+  }
+
+  if (!user) {
+    return (
+      <div className="login-page">
+        <div className="login-card">
+          <h1>Paper Trading Dashboard</h1>
+          <p>Log in to access your trading workspace</p>
+
+          <input
+           type="email"
+           placeholder="Email"
+           value={loginEmail}
+           onChange={(e) => setLoginEmail(e.target.value)}
+          />
+
+          <input
+           type="password"
+           placeholder="Password"
+           value={loginPassword}
+           onChange={(e) => setLoginPassword(e.target.value)}
+          />
+
+          <button onClick={handleLogin}>Log In</button>
+
+          {isRegistering ? (
+            <>
+            <h2>Create Account</h2>
+
+            <input
+              type="email"
+              placeholder="Email"
+              value={registerEmail}
+              onChange={(e) => setRegisterEmail(e.target.value)}
+            />
+
+            <input
+              type="password"
+              placeholder="Password"
+              value={registerPassword}
+              onChange={(e) => setRegisterPassword(e.target.value)}
+            />
+
+            <button onClick={handleRegister}>
+              Create Account
+            </button>
+
+            <button 
+                className="text-button"
+                onClick={() => setIsRegistering(false)}
+              >
+                ← Back to Login</button>  
+           </>
+          ) : (
+            <div className="auth-footer">
+              <button
+                className="secondary-button"
+                onClick={() => setIsRegistering(true)}
+                >
+                  Create Account
+                </button>
+            </div>
+          )}
+
+          {registerMessage && (
+            <p>{registerMessage}</p>
+          )}
+
+          {authMessage && <p className="error-message">{authMessage}</p>} 
+        </div>
+      </div>
+    );
+  }
+
+  async function handleRegister() {
+    try {
+      setRegisterMessage("");
+
+      const response = await axios.post(
+        `${API_URL}/api/register`,
+        {
+          email: registerEmail,
+          password: registerPassword,
+        }
+      );
+
+      setRegisterMessage(response.data.message);
+
+      setRegisterEmail("");
+      setRegisterPassword("");
+    } catch (error) {
+      setRegisterMessage(
+        error.response?.data?.error || "Registration failed"
+      );
+    }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("token");
+    setUser(null);
+
+    setPositions([]);
+    setTradeHistory([]);
+    setCashBalance(100000);
+  }
+
+  const stockChartData = {
+    lables: priceHistory.map((point) => point.time),
+    datasets: [
+      {
+        label: selectedStock,
+        data: priceHistory.map((point) => point.price),
+        borderColor: "#22c55e",
+        backgroundColor: "rgba(34,197,94,0.2",
+        tension: 0.4,
+        fill: true,
+        pointRadius: 0,
+      },
+    ],
+  };
+
+  const stockChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          color: "#9ca3af",
+        },
+        grid: {
+          color: "#1f2937",
+        },
+      },
+      y: {
+        ticks: {
+          color: "#9ca3af",
+        },
+        grid: {
+          color: "#1f2937",
+        },
+      },
+    },
+  };
+
   return (
     <div className="app">
 
       <h1>Paper Trading Dashboard</h1>
+
+      <p className="auth-subtitle">
+        {isRegistering
+        ? "Create your account to start paper trading."
+        : "Login to access your trading workspace."}
+      </p>
+
+      <button onClick={handleLogout}>Logout</button>
 
       <div className="dashboard-grid">
 
@@ -401,17 +746,26 @@ function App() {
           <div className="metrics-grid">
             <div className="metric-card">
               <span>Account Value</span>
-              <strong>${accountValue.toLocaleString()}</strong>
+              <strong>${accountValue.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}</strong>
             </div>
 
             <div className="metric-card">
               <span>Cash</span>
-              <strong>${cashBalance.toLocaleString()}</strong>
+              <strong>${cashBalance.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}</strong>
             </div>
 
             <div className="metric-card">
               <span>Portfolio Value</span>
-              <strong>${portfolioValue.toLocaleString()}</strong>
+              <strong>${portfolioValue.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}</strong>
             </div>
 
             <div className="metric-card">
@@ -422,7 +776,7 @@ function App() {
 
             <div className="metric-card">
               <span>Total Trades</span>
-              <strong>${tradeHistory.length}</strong>
+              <strong>{tradeHistory.length}</strong>
             </div>
           </div>
         </section>
